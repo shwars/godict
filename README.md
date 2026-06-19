@@ -1,0 +1,2 @@
+# godict
+Go GPT Dictator
