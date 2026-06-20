@@ -12,16 +12,68 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build-windows-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24.x'
-      - name: Build release archives
+      - name: Build Windows and Linux archives
         shell: pwsh
-        run: ./scripts/build-release.ps1 -Version '${{ inputs.version }}'
+        run: ./scripts/build-release.ps1 -Version '${{ inputs.version }}' -Targets windows-amd64,linux-amd64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-linux
+          path: releases/*.zip
+          if-no-files-found: error
+
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Build each architecture natively. Docker/Fyne-cross cannot build a
+          # macOS binary on Linux without a separately supplied Apple SDK.
+          - runner: macos-13
+            arch: amd64
+          - runner: macos-14
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Build macOS archive
+        env:
+          VERSION: ${{ inputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          name="godict_${VERSION}_darwin_${ARCH}"
+          mkdir -p "releases/${name}"
+          go build -trimpath -ldflags="-s -w" -o "releases/${name}/godict" .
+          cp godict.config "releases/${name}/godict.config"
+          (
+            cd releases
+            ditto -c -k --sequesterRsrc --keepParent "${name}" "${name}.zip"
+          )
+          rm -rf "releases/${name}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-${{ matrix.arch }}
+          path: releases/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: [build-windows-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: releases
+          merge-multiple: true
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

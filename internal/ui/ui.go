@@ -27,6 +27,7 @@ type Desktop struct {
 	languageSelect *widget.Select
 	button         *widget.Button
 	status         *widget.Label
+	stream         speechkit.Stream
 	recording      bool
 	processing     bool
 }
@@ -82,43 +83,70 @@ func (d *Desktop) toggle() {
 }
 
 func (d *Desktop) start() {
-	if err := d.recorder.Start(); err != nil {
-		d.setReadyError(err)
-		return
-	}
-	d.recording = true
-	d.button.SetText("Stop recording")
-	d.status.SetText("Recording…")
-	d.modelSelect.Disable()
-	d.templateSelect.Disable()
-	d.languageSelect.Disable()
+	d.processing = true
+	d.button.Disable()
+	d.button.SetText("Connecting…")
+	d.status.SetText("Connecting to SpeechKit…")
+	language := d.config.Speech.Languages[d.languageSelect.Selected]
+	go func() {
+		stream, err := (speechkit.Client{APIKey: d.config.Speech.APIKey, FolderID: d.config.Speech.FolderID}).Start(context.Background(), language)
+		if err == nil {
+			err = d.recorder.Start(stream.Send)
+		}
+		fyne.Do(func() {
+			if err != nil {
+				if stream != nil {
+					stream.Cancel()
+				}
+				d.setReadyError(err)
+				return
+			}
+			d.stream = stream
+			d.processing, d.recording = false, true
+			d.button.Enable()
+			d.button.SetText("Stop recording")
+			d.status.SetText("Recording…")
+			d.modelSelect.Disable()
+			d.templateSelect.Disable()
+			d.languageSelect.Disable()
+		})
+	}()
 }
 
 func (d *Desktop) stopAndProcess() {
-	wav, err := d.recorder.Stop()
 	d.recording = false
-	if err != nil {
-		d.setReadyError(err)
-		return
-	}
 	d.processing = true
 	d.button.SetText("Processing…")
 	d.button.Disable()
-	d.status.SetText("Recognizing speech…")
+	d.status.SetText("Finalizing transcript…")
 
 	model := d.selectedModel()
 	template := d.selectedTemplate().Text
-	language := d.config.Speech.Languages[d.languageSelect.Selected]
+	stream := d.stream
+	d.stream = nil
 	go func() {
+		if stream == nil {
+			fyne.Do(func() { d.setReadyError(fmt.Errorf("SpeechKit stream is not active")) })
+			return
+		}
+		if err := d.recorder.Stop(); err != nil {
+			stream.Cancel()
+			fyne.Do(func() { d.setReadyError(err) })
+			return
+		}
+		recognized, err := stream.Close()
+		if err != nil {
+			fyne.Do(func() { d.setReadyError(err) })
+			return
+		}
 		processor := workflow.Processor{
-			Recognizer: speechkit.Client{APIKey: d.config.Speech.APIKey, FolderID: d.config.Speech.FolderID},
-			Generator:  llm.Client{Model: model},
-			Clipboard:  d.app.Clipboard(),
+			Generator: llm.Client{Model: model},
+			Clipboard: d.app.Clipboard(),
 			OnGenerating: func() {
 				fyne.Do(func() { d.status.SetText("Generating text…") })
 			},
 		}
-		err := processor.Process(context.Background(), wav, language, template)
+		err = processor.ProcessRecognized(context.Background(), recognized, template)
 		fyne.Do(func() {
 			d.processing = false
 			if err != nil {

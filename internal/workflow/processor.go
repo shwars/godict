@@ -39,6 +39,15 @@ func (p Processor) Process(ctx context.Context, audio []byte, language, template
 	if err != nil {
 		return err
 	}
+	return p.ProcessRecognized(ctx, recognized, template)
+}
+
+// ProcessRecognized runs the template, LLM, and clipboard portion of the
+// workflow after a live recognizer has already finalized its transcript.
+func (p Processor) ProcessRecognized(ctx context.Context, recognized, template string) error {
+	if p.Generator == nil || p.Clipboard == nil {
+		return fmt.Errorf("workflow is not fully configured")
+	}
 	clipboard := ""
 	if prompt.NeedsClipboard(template) {
 		clipboard = p.Clipboard.Content()

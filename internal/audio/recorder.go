@@ -7,22 +7,34 @@ import (
 	"github.com/gen2brain/malgo"
 )
 
-// Recorder captures a single microphone recording in raw PCM16 mono at 16 kHz.
+// ChunkHandler receives a copy of each PCM16 mono audio chunk. Implementations
+// must return quickly: it is called from the microphone callback.
+type ChunkHandler func([]byte) error
+
+// Recorder streams microphone samples as raw PCM16 mono at 16 kHz. It never
+// accumulates a recording in memory, which keeps long dictations bounded.
 type Recorder struct {
-	mu      sync.Mutex
-	ctx     *malgo.AllocatedContext
-	device  *malgo.Device
-	samples []byte
-	active  bool
+	mu          sync.Mutex
+	ctx         *malgo.AllocatedContext
+	device      *malgo.Device
+	handler     ChunkHandler
+	active      bool
+	chunks      uint64
+	callbackErr error
 }
 
-func (r *Recorder) Start() error {
+// Start opens the default microphone and begins delivering chunks to handler.
+func (r *Recorder) Start(handler ChunkHandler) error {
+	if handler == nil {
+		return fmt.Errorf("audio chunk handler is required")
+	}
 	r.mu.Lock()
 	if r.active {
 		r.mu.Unlock()
 		return fmt.Errorf("recording is already active")
 	}
 	r.mu.Unlock()
+
 	ctx, err := malgo.InitContext(nil, malgo.ContextConfig{}, func(string) {})
 	if err != nil {
 		return fmt.Errorf("initialize microphone: %w", err)
@@ -31,13 +43,28 @@ func (r *Recorder) Start() error {
 	config.Capture.Format = malgo.FormatS16
 	config.Capture.Channels = 1
 	config.SampleRate = SampleRate
-	r.samples = nil
 	callbacks := malgo.DeviceCallbacks{Data: func(_, input []byte, _ uint32) {
+		// malgo owns input after this callback returns, so make an independent
+		// copy before handing it to the streaming transport.
+		chunk := append([]byte(nil), input...)
 		r.mu.Lock()
-		defer r.mu.Unlock()
-		if r.active {
-			r.samples = append(r.samples, input...)
+		if !r.active || r.callbackErr != nil {
+			r.mu.Unlock()
+			return
 		}
+		h := r.handler
+		r.mu.Unlock()
+		if err := h(chunk); err != nil {
+			r.mu.Lock()
+			if r.callbackErr == nil {
+				r.callbackErr = err
+			}
+			r.mu.Unlock()
+			return
+		}
+		r.mu.Lock()
+		r.chunks++
+		r.mu.Unlock()
 	}}
 	device, err := malgo.InitDevice(ctx.Context, config, callbacks)
 	if err != nil {
@@ -45,6 +72,7 @@ func (r *Recorder) Start() error {
 		ctx.Free()
 		return fmt.Errorf("open microphone: %w", err)
 	}
+
 	r.mu.Lock()
 	if r.active {
 		r.mu.Unlock()
@@ -53,7 +81,8 @@ func (r *Recorder) Start() error {
 		ctx.Free()
 		return fmt.Errorf("recording is already active")
 	}
-	r.ctx, r.device, r.active = ctx, device, true
+	r.ctx, r.device, r.handler = ctx, device, handler
+	r.active, r.chunks, r.callbackErr = true, 0, nil
 	r.mu.Unlock()
 	if err := device.Start(); err != nil {
 		r.release(device, ctx)
@@ -62,27 +91,32 @@ func (r *Recorder) Start() error {
 	return nil
 }
 
-func (r *Recorder) Stop() ([]byte, error) {
+// Stop stops capture and waits for malgo to release its callback. Chunks already
+// accepted by the handler are owned by the downstream streaming session.
+func (r *Recorder) Stop() error {
 	r.mu.Lock()
 	if !r.active {
 		r.mu.Unlock()
-		return nil, fmt.Errorf("recording is not active")
+		return fmt.Errorf("recording is not active")
 	}
-	pcm := append([]byte(nil), r.samples...)
-	device, ctx := r.device, r.ctx
-	r.device, r.ctx, r.active = nil, nil, false
+	device, ctx, chunks, callbackErr := r.device, r.ctx, r.chunks, r.callbackErr
+	r.device, r.ctx, r.handler = nil, nil, nil
+	r.active = false
 	r.mu.Unlock()
 	r.cleanup(device, ctx)
-	if len(pcm) == 0 {
-		return nil, fmt.Errorf("no audio was recorded")
+	if callbackErr != nil {
+		return fmt.Errorf("stream microphone audio: %w", callbackErr)
 	}
-	return pcm, nil
+	if chunks == 0 {
+		return fmt.Errorf("no audio was recorded")
+	}
+	return nil
 }
 
 func (r *Recorder) release(device *malgo.Device, ctx *malgo.AllocatedContext) {
 	r.mu.Lock()
 	if r.device == device {
-		r.device, r.ctx, r.active = nil, nil, false
+		r.device, r.ctx, r.handler, r.active = nil, nil, nil, false
 	}
 	r.mu.Unlock()
 	r.cleanup(device, ctx)

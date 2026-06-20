@@ -1,6 +1,6 @@
 # GoDict
 
-GoDict is a small cross-platform desktop dictator. Choose a prompt template, LLM, and recognition language; press **Start recording**, dictate, then press **Stop recording**. GoDict sends raw 16-bit PCM microphone audio to Yandex SpeechKit, sends the recognized text to an OpenAI Responses-compatible LLM, and copies the generated result to the clipboard.
+GoDict is a small cross-platform desktop dictator. Choose a prompt template, LLM, and recognition language; press **Start recording**, dictate, then press **Stop recording**. GoDict streams raw 16-bit PCM microphone audio to Yandex SpeechKit v3 while you dictate, then sends the final recognized text to an OpenAI Responses-compatible LLM and copies the generated result to the clipboard. It does not use SpeechKit's 1 MB short-audio HTTP endpoint, so long recordings are governed by the active streaming session and account limits rather than a 30-second client upload limit.
 
 ## Setup
 

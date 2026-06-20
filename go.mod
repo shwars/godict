@@ -6,7 +6,10 @@ require (
 	fyne.io/fyne/v2 v2.6.3
 	github.com/gen2brain/malgo v0.11.23
 	github.com/hashicorp/hcl/v2 v2.24.0
+	github.com/yandex-cloud/go-genproto v0.88.0
 	github.com/zclconf/go-cty v1.16.3
+	google.golang.org/grpc v1.66.2
+	google.golang.org/protobuf v1.34.2
 )
 
 require (
@@ -47,5 +50,7 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/tools v0.24.1 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
