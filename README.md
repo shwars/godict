@@ -39,7 +39,7 @@ PROMPT
 }
 ```
 
-`{recognized_text}` is replaced with the SpeechKit result. If it is absent, the result is appended to the template. `{clipboard}` is replaced with the current clipboard text only when that exact placeholder is present. An empty clipboard becomes an empty string; templates without `{clipboard}` never trigger a clipboard read.
+`{recognized_text}` is replaced with the SpeechKit result. If it is absent, the result is appended to the template. `{language}` is replaced with the selected SpeechKit language code, including `auto` for the Auto selection. `{clipboard}` is replaced with the current clipboard text only when that exact placeholder is present. An empty clipboard becomes an empty string; templates without `{clipboard}` never trigger a clipboard read.
 
 `project` is optional on a model and is sent as the `OpenAI-Project` header, which is useful for Yandex AI Studio’s OpenAI-compatible API.
 
