@@ -58,8 +58,9 @@ Build a subset when you only need one platform, for example:
 ```powershell
 .\scripts\build-release.ps1 -Version 0.1.0 -Targets windows-amd64
 .\scripts\build-release.ps1 -Version 0.1.0 -Targets windows-amd64,darwin-arm64
+.\scripts\build-release.ps1 -Version 0.1.0 -Targets darwin-amd64
 ```
 
-The release script requires Docker. It uses Fyne’s cross-build image to create standalone binaries for Windows x64, Linux x64, macOS x64, and macOS ARM64. Output ZIP files are written to `releases/`, which is ignored by Git. macOS builds are unsigned, so users may need to approve them in System Settings before launching from Terminal.
+The release script requires Docker. By default it creates standalone binaries for Windows x64, Windows ARM64, Linux x64, and macOS ARM64. macOS x64 remains available as the explicit `darwin-amd64` target, but is excluded by default. Output ZIP files are written to `releases/`, which is ignored by Git. macOS builds are unsigned, so users may need to approve them in System Settings before launching from Terminal.
 
 The GitHub Actions **Release** workflow is manually triggered with a version and publishes the same archives as a GitHub Release.

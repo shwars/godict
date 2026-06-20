@@ -5,8 +5,8 @@ param(
     [string]$Version,
 
     # Select one or more exact OS/architecture combinations. Omit for all targets.
-    [ValidateSet('windows-amd64', 'linux-amd64', 'darwin-amd64', 'darwin-arm64')]
-    [string[]]$Targets = @('windows-amd64', 'linux-amd64', 'darwin-amd64', 'darwin-arm64')
+    [ValidateSet('windows-amd64', 'windows-arm64', 'linux-amd64', 'darwin-amd64', 'darwin-arm64')]
+    [string[]]$Targets = @('windows-amd64', 'windows-arm64', 'linux-amd64', 'darwin-arm64')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +23,7 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $intermediate
 
 $targetDefinitions = @{
     'windows-amd64' = @{ OS = 'windows'; Arch = 'amd64'; Executable = 'godict.exe' }
+    'windows-arm64' = @{ OS = 'windows'; Arch = 'arm64'; Executable = 'godict.exe' }
     'linux-amd64'   = @{ OS = 'linux';   Arch = 'amd64'; Executable = 'godict' }
     'darwin-amd64'  = @{ OS = 'darwin';  Arch = 'amd64'; Executable = 'godict' }
     'darwin-arm64'  = @{ OS = 'darwin';  Arch = 'arm64'; Executable = 'godict' }
