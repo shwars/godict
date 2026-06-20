@@ -7,6 +7,14 @@ on:
         description: Release version without the v prefix (for example, 0.1.0)
         required: true
         type: string
+      title:
+        description: Release title shown on GitHub
+        required: true
+        type: string
+      description:
+        description: Release description (Markdown supported)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -69,6 +77,8 @@ jobs:
     needs: [build-windows-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
+      # gh resolves --target through the local checkout, not only the SHA.
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: releases
@@ -76,4 +86,6 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "v${{ inputs.version }}" releases/*.zip --target "${{ github.sha }}" --title "GoDict v${{ inputs.version }}" --generate-notes
+          RELEASE_TITLE: ${{ inputs.title }}
+          RELEASE_DESCRIPTION: ${{ inputs.description }}
+        run: gh release create "v${{ inputs.version }}" releases/*.zip --target "${{ github.sha }}" --title "$RELEASE_TITLE" --notes "$RELEASE_DESCRIPTION"
