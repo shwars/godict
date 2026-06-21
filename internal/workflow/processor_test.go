@@ -69,3 +69,12 @@ func TestProcessorDoesNotOverwriteClipboardOnFailure(t *testing.T) {
 		t.Fatalf("err=%v writes=%d content=%q", err, clip.writes, clip.content)
 	}
 }
+
+func TestProcessorReportsOnlySuccessfulResult(t *testing.T) {
+	clip := &fakeClipboard{}
+	called := ""
+	err := (Processor{Generator: &fakeGenerator{output: "result"}, Clipboard: clip, OnResult: func(result string) { called = result }}).ProcessRecognized(context.Background(), "speech", "auto", "{recognized_text}")
+	if err != nil || called != "result" || clip.content != "result" {
+		t.Fatalf("err=%v result=%q clipboard=%q", err, called, clip.content)
+	}
+}

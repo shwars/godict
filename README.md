@@ -39,9 +39,11 @@ PROMPT
 }
 ```
 
-`{recognized_text}` is replaced with the SpeechKit result. If it is absent, the result is appended to the template. `{language}` is replaced with the selected SpeechKit language code, including `auto` for the Auto selection. `{clipboard}` is replaced with the current clipboard text only when that exact placeholder is present. An empty clipboard becomes an empty string; templates without `{clipboard}` never trigger a clipboard read.
+`{recognized_text}` is replaced with the SpeechKit result. If it is absent, the result is appended to the template. `{language}` is replaced with the selected SpeechKit language code, including `auto` for the Auto selection. `{clipboard}` is replaced with the current clipboard text only when that exact placeholder is present. An empty clipboard becomes an empty string; templates without `{clipboard}` never trigger a clipboard read. Set `default = true` on one template block to pre-select it when GoDict starts.
 
 `project` is optional on a model and is sent as the `OpenAI-Project` header, which is useful for Yandex AI Studio’s OpenAI-compatible API.
+
+`reasoning` is optional on a model. When set, GoDict sends it as the Responses API `reasoning.effort`; when omitted, it does not send a reasoning field. Define duplicate model blocks with distinct names when you need the same model at different reasoning levels. The **Web search** checkbox sends `tools: [{"type":"web_search"}]`. **Display result** reveals a read-only result panel while continuing to copy successful output to the clipboard.
 
 ## Local development and releases
 

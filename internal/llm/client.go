@@ -15,6 +15,7 @@ import (
 type Client struct {
 	Model      config.Model
 	HTTPClient *http.Client
+	WebSearch  bool
 }
 
 func (c Client) Generate(ctx context.Context, input string) (string, error) {
@@ -24,6 +25,12 @@ func (c Client) Generate(ctx context.Context, input string) (string, error) {
 	}
 	payload["model"] = c.Model.ModelName
 	payload["input"] = input
+	if c.Model.Reasoning != "" {
+		payload["reasoning"] = map[string]string{"effort": c.Model.Reasoning}
+	}
+	if c.WebSearch {
+		payload["tools"] = []map[string]string{{"type": "web_search"}}
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("encode Responses request: %w", err)

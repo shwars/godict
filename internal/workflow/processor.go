@@ -27,6 +27,8 @@ type Processor struct {
 	Clipboard  Clipboard
 	// OnGenerating runs after speech recognition and immediately before the LLM request.
 	OnGenerating func()
+	// OnResult runs only after a successful generated result is available.
+	OnResult func(string)
 }
 
 // Process recognizes recorded audio, conditionally reads the clipboard, generates
@@ -60,5 +62,8 @@ func (p Processor) ProcessRecognized(ctx context.Context, recognized, language, 
 		return err
 	}
 	p.Clipboard.SetContent(result)
+	if p.OnResult != nil {
+		p.OnResult(result)
+	}
 	return nil
 }

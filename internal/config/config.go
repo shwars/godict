@@ -39,12 +39,14 @@ type Model struct {
 	APIKey    string
 	Project   string
 	Params    map[string]any
+	Reasoning string
 	Default   bool
 }
 
 type Template struct {
-	Name string
-	Text string
+	Name    string
+	Text    string
+	Default bool
 }
 
 func Load(path string) (*Config, error) {
@@ -140,6 +142,15 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("every template requires text")
 		}
 	}
+	templateDefaults := 0
+	for _, template := range c.Templates {
+		if template.Default {
+			templateDefaults++
+		}
+	}
+	if templateDefaults > 1 {
+		return fmt.Errorf("only one template may be marked default")
+	}
 	return nil
 }
 
@@ -150,6 +161,15 @@ func (c *Config) DefaultModel() Model {
 		}
 	}
 	return c.Models[0]
+}
+
+func (c *Config) DefaultTemplate() Template {
+	for _, template := range c.Templates {
+		if template.Default {
+			return template
+		}
+	}
+	return c.Templates[0]
 }
 
 func (c *Config) LanguageNames() []string {
@@ -228,6 +248,10 @@ func decodeModel(name string, body hcl.Body) (Model, error) {
 	if err != nil {
 		return Model{}, fmt.Errorf("model %q: %w", name, err)
 	}
+	reasoning, err := optionalString(attrs, "reasoning")
+	if err != nil {
+		return Model{}, fmt.Errorf("model %q: %w", name, err)
+	}
 	params := map[string]any{}
 	if attr, ok := attrs["params"]; ok {
 		value, diags := attr.Expr.Value(nil)
@@ -242,7 +266,7 @@ func decodeModel(name string, body hcl.Body) (Model, error) {
 			return Model{}, fmt.Errorf("model %q params: %w", name, err)
 		}
 	}
-	return Model{Name: name, ModelName: modelName, BaseURL: baseURL, APIKey: apiKey, Project: project, Params: params, Default: defaultValue}, nil
+	return Model{Name: name, ModelName: modelName, BaseURL: baseURL, APIKey: apiKey, Project: project, Params: params, Reasoning: reasoning, Default: defaultValue}, nil
 }
 
 func decodeTemplate(name string, body hcl.Body) (Template, error) {
@@ -254,7 +278,11 @@ func decodeTemplate(name string, body hcl.Body) (Template, error) {
 	if err != nil {
 		return Template{}, fmt.Errorf("template %q: %w", name, err)
 	}
-	return Template{Name: name, Text: text}, nil
+	defaultValue, err := optionalBool(attrs, "default")
+	if err != nil {
+		return Template{}, fmt.Errorf("template %q: %w", name, err)
+	}
+	return Template{Name: name, Text: text, Default: defaultValue}, nil
 }
 
 func requiredValue(attrs hcl.Attributes, name string) (cty.Value, error) {

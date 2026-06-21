@@ -18,6 +18,7 @@ model "one" {
   base_url = "https://example.test/v1"
   api_key = "%TEST_API_KEY%"
   params = { reasoning = { effort = "none" } }
+  reasoning = "low"
   default = true
 }
 template "edit" { text = "Edit {recognized_text}" }
@@ -38,6 +39,9 @@ func TestLoadExpandsEnvironmentAndParams(t *testing.T) {
 	}
 	if got := cfg.DefaultModel().Params["reasoning"].(map[string]any)["effort"]; got != "none" {
 		t.Fatalf("params = %#v", cfg.DefaultModel().Params)
+	}
+	if got := cfg.DefaultModel().Reasoning; got != "low" {
+		t.Fatalf("reasoning = %q", got)
 	}
 	if got := cfg.LanguageNames(); strings.Join(got, ",") != "Auto,English" {
 		t.Fatalf("languages = %v", got)
@@ -74,7 +78,7 @@ func TestBundledConfigParses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.Models) != 10 || len(cfg.Templates) != 2 {
+	if len(cfg.Models) != 10 || len(cfg.Templates) != 4 {
 		t.Fatalf("models=%d templates=%d", len(cfg.Models), len(cfg.Templates))
 	}
 }

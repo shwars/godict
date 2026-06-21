@@ -20,13 +20,13 @@ func TestGenerateUsesResponsesAPI(t *testing.T) {
 			t.Errorf("headers = %#v", r.Header)
 		}
 		body, _ := io.ReadAll(r.Body)
-		if !strings.Contains(string(body), `"model":"model"`) || !strings.Contains(string(body), `"input":"hello"`) {
+		if !strings.Contains(string(body), `"model":"model"`) || !strings.Contains(string(body), `"input":"hello"`) || !strings.Contains(string(body), `"effort":"low"`) || !strings.Contains(string(body), `"type":"web_search"`) {
 			t.Errorf("body = %s", body)
 		}
 		_, _ = w.Write([]byte(`{"output":[{"content":[{"type":"output_text","text":"done"}]}]}`))
 	}))
 	defer server.Close()
-	client := Client{Model: config.Model{ModelName: "model", BaseURL: server.URL + "/v1", APIKey: "key", Project: "folder", Params: map[string]any{"reasoning": map[string]any{"effort": "none"}}}}
+	client := Client{Model: config.Model{ModelName: "model", BaseURL: server.URL + "/v1", APIKey: "key", Project: "folder", Reasoning: "low"}, WebSearch: true}
 	got, err := client.Generate(context.Background(), "hello")
 	if err != nil || got != "done" {
 		t.Fatalf("Generate() = %q, %v", got, err)

@@ -28,6 +28,10 @@ type Desktop struct {
 	modelSelect    *widget.Select
 	templateSelect *widget.Select
 	languageSelect *widget.Select
+	webSearchCheck *widget.Check
+	displayCheck   *widget.Check
+	resultBox      *widget.Entry
+	root           *fyne.Container
 	button         *widget.Button
 	status         *widget.Label
 	statusDot      *canvas.Circle
@@ -58,9 +62,24 @@ func New(app fyne.App, cfg *config.Config) *Desktop {
 	d.modelSelect = widget.NewSelect(modelNames, nil)
 	d.modelSelect.SetSelected(cfg.DefaultModel().Name)
 	d.templateSelect = widget.NewSelect(templateNames, nil)
-	d.templateSelect.SetSelected(templateNames[0])
+	d.templateSelect.SetSelected(cfg.DefaultTemplate().Name)
 	d.languageSelect = widget.NewSelect(cfg.LanguageNames(), nil)
 	d.languageSelect.SetSelected(cfg.Speech.DefaultLanguage)
+	d.webSearchCheck = widget.NewCheck("Web search", nil)
+	d.displayCheck = widget.NewCheck("Display result", func(show bool) {
+		if show {
+			d.resultBox.Show()
+		} else {
+			d.resultBox.Hide()
+		}
+		d.window.Resize(d.root.MinSize())
+	})
+	d.resultBox = widget.NewMultiLineEntry()
+	// Fyne 2.6 does not provide Entry.SetReadOnly; a disabled Entry is the
+	// supported non-editable multiline display control in this release.
+	d.resultBox.Disable()
+	d.resultBox.SetMinRowsVisible(6)
+	d.resultBox.Hide()
 	selectWidth := widestSelectWidth(d.templateSelect.Options, d.modelSelect.Options, d.languageSelect.Options)
 	d.button = widget.NewButtonWithIcon("Start recording", microphoneIcon, d.toggle)
 	d.button.Importance = widget.HighImportance
@@ -78,15 +97,18 @@ func New(app fyne.App, cfg *config.Config) *Desktop {
 		fieldRow("LLM", d.modelSelect, selectWidth),
 		fieldRow("LANGUAGE", d.languageSelect, selectWidth),
 	)
+	options := container.NewVBox(d.webSearchCheck, d.displayCheck)
 	recordArea := container.NewVBox(
 		container.NewCenter(d.button),
 		container.NewCenter(container.NewHBox(statusDot, d.status)),
 		container.NewCenter(d.waveform),
 	)
-	content := container.NewVBox(fields, divider, recordArea)
-	root := container.NewStack(canvas.NewRectangle(color.NRGBA{R: 19, G: 27, B: 47, A: 255}), container.NewPadded(content))
-	d.window.SetContent(root)
-	d.window.Resize(root.MinSize())
+	top := container.NewVBox(fields, options, divider)
+	// Border gives the visible result entry all spare vertical space on resize.
+	content := container.NewBorder(top, recordArea, nil, nil, d.resultBox)
+	d.root = container.NewStack(canvas.NewRectangle(color.NRGBA{R: 19, G: 27, B: 47, A: 255}), container.NewPadded(content))
+	d.window.SetContent(d.root)
+	d.window.Resize(d.root.MinSize())
 	return d
 }
 
@@ -181,6 +203,8 @@ func (d *Desktop) start() {
 			d.modelSelect.Disable()
 			d.templateSelect.Disable()
 			d.languageSelect.Disable()
+			d.webSearchCheck.Disable()
+			d.displayCheck.Disable()
 		})
 	}()
 }
@@ -217,8 +241,15 @@ func (d *Desktop) stopAndProcess() {
 			return
 		}
 		processor := workflow.Processor{
-			Generator: llm.Client{Model: model},
+			Generator: llm.Client{Model: model, WebSearch: d.webSearchCheck.Checked},
 			Clipboard: d.app.Clipboard(),
+			OnResult: func(result string) {
+				fyne.Do(func() {
+					if d.displayCheck.Checked {
+						d.resultBox.SetText(result)
+					}
+				})
+			},
 			OnGenerating: func() {
 				fyne.Do(func() { d.status.SetText("Generating text…") })
 			},
@@ -237,6 +268,8 @@ func (d *Desktop) stopAndProcess() {
 			d.modelSelect.Enable()
 			d.templateSelect.Enable()
 			d.languageSelect.Enable()
+			d.webSearchCheck.Enable()
+			d.displayCheck.Enable()
 			d.status.SetText("Copied to clipboard")
 			d.setStatusColor(color.NRGBA{R: 34, G: 197, B: 94, A: 255})
 		})
@@ -252,6 +285,8 @@ func (d *Desktop) setReadyError(err error) {
 	d.modelSelect.Enable()
 	d.templateSelect.Enable()
 	d.languageSelect.Enable()
+	d.webSearchCheck.Enable()
+	d.displayCheck.Enable()
 	d.status.SetText("Error: " + friendlyError(err))
 	d.setStatusColor(color.NRGBA{R: 251, G: 113, B: 133, A: 255})
 }
@@ -278,7 +313,7 @@ func (goDictTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) co
 		theme.ColorNameOverlayBackground:   color.NRGBA{R: 19, G: 27, B: 47, A: 255},
 		theme.ColorNameSelection:           color.NRGBA{R: 35, G: 66, B: 113, A: 255},
 		theme.ColorNameHover:               color.NRGBA{R: 30, G: 57, B: 99, A: 255},
-		theme.ColorNameDisabled:            color.NRGBA{R: 142, G: 160, B: 184, A: 110},
+		theme.ColorNameDisabled:            color.NRGBA{R: 226, G: 232, B: 240, A: 255},
 		theme.ColorNameSeparator:           color.NRGBA{R: 30, G: 42, B: 67, A: 255},
 		theme.ColorNameError:               color.NRGBA{R: 251, G: 113, B: 133, A: 255},
 		theme.ColorNameSuccess:             color.NRGBA{R: 34, G: 197, B: 94, A: 255},
