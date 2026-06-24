@@ -83,7 +83,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { path: releases, merge-multiple: true }
       - name: Validate release metadata
-        env: { TITLE: ${{ inputs.title }}, DESCRIPTION: ${{ inputs.description }} }
+        env:
+          TITLE: ${{ inputs.title }}
+          DESCRIPTION: ${{ inputs.description }}
         run: test -n "$TITLE" && test -n "$DESCRIPTION"
       - name: Create GitHub release
         env:
