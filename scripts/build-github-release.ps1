@@ -49,7 +49,13 @@ try {
         if ($hostOS -ne $targetDefinition.OS -or $hostArch -ne $targetDefinition.Arch) {
             throw "Native target $Target requires $($targetDefinition.OS)/$($targetDefinition.Arch), got $hostOS/$hostArch."
         }
-        & go build -trimpath '-ldflags=-s -w' -o $destination .
+        $linkerFlags = '-s -w'
+        if ($Target -eq 'windows-amd64') {
+            # Match the GUI-subsystem executable produced by Fyne-cross so an
+            # interactive Windows shell does not remain attached to GoDict.
+            $linkerFlags = '-s -w -H=windowsgui'
+        }
+        & go build -trimpath "-ldflags=$linkerFlags" -o $destination .
         if ($LASTEXITCODE -ne 0) { throw "Native build failed for $Target." }
     }
     foreach ($config in 'godict.config', 'godict.ru.config', 'godict.en.config') {

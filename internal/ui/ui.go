@@ -194,7 +194,8 @@ func (d *Desktop) start() {
 			d.button.SetText("Stop recording")
 			d.button.SetIcon(theme.MediaStopIcon())
 			d.button.Importance = widget.DangerImportance
-			d.status.SetText("* Recording")
+			d.status.SetText("Recording")
+			d.setStatusColor(color.NRGBA{R: 34, G: 197, B: 94, A: 255})
 			d.modelSelect.Disable()
 			d.templateSelect.Disable()
 			d.languageSelect.Disable()
@@ -249,7 +250,9 @@ func (d *Desktop) stopAndProcess() {
 			},
 		}
 		err = processor.ProcessRecognized(context.Background(), recognized, language, template)
-		if err == nil && d.config.Settings.BeepOnCompletion { audio.Beep() }
+		if err == nil && d.config.Settings.BeepOnCompletion {
+			audio.Beep()
+		}
 		fyne.Do(func() {
 			d.processing = false
 			if err != nil {
