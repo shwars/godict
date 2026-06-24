@@ -20,10 +20,12 @@ var envReference = regexp.MustCompile(`%([A-Za-z_][A-Za-z0-9_]*)%`)
 
 // Config is the complete application configuration.
 type Config struct {
+	Settings  Settings
 	Speech    Speech
 	Models    []Model
 	Templates []Template
 }
+type Settings struct { BeepOnCompletion bool }
 
 type Speech struct {
 	APIKey          string
@@ -56,15 +58,22 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parse configuration: %s", diags.Error())
 	}
 	content, diags := file.Body.Content(&hcl.BodySchema{Blocks: []hcl.BlockHeaderSchema{
-		{Type: "speech"}, {Type: "model", LabelNames: []string{"name"}}, {Type: "template", LabelNames: []string{"name"}},
+		{Type: "settings"}, {Type: "speech"}, {Type: "model", LabelNames: []string{"name"}}, {Type: "template", LabelNames: []string{"name"}},
 	}})
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("read configuration: %s", diags.Error())
 	}
 
-	cfg := &Config{}
+	cfg := &Config{Settings: Settings{BeepOnCompletion: true}}
+	seenSettings := false
 	for _, block := range content.Blocks {
 		switch block.Type {
+		case "settings":
+			if seenSettings { return nil, fmt.Errorf("configuration may contain only one settings block") }
+			settings, err := decodeSettings(block.Body)
+			if err != nil { return nil, err }
+			cfg.Settings = settings
+			seenSettings = true
 		case "speech":
 			if cfg.Speech.APIKey != "" {
 				return nil, fmt.Errorf("configuration may contain only one speech block")
@@ -104,6 +113,15 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func decodeSettings(body hcl.Body) (Settings, error) {
+	attrs, diags := body.JustAttributes()
+	if diags.HasErrors() { return Settings{}, fmt.Errorf("read settings block: %s", diags.Error()) }
+	beep, err := optionalBool(attrs, "beep_on_completion")
+	if err != nil { return Settings{}, err }
+	if _, ok := attrs["beep_on_completion"]; !ok { beep = true }
+	return Settings{BeepOnCompletion: beep}, nil
 }
 
 func (c *Config) Validate() error {

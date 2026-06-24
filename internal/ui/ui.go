@@ -87,8 +87,6 @@ func New(app fyne.App, cfg *config.Config) *Desktop {
 	d.status.Alignment = fyne.TextAlignCenter
 	d.statusDot = canvas.NewCircle(color.NRGBA{R: 142, G: 160, B: 184, A: 255})
 	statusDot := statusDotSlot(d.statusDot)
-	d.waveform = waveform()
-	d.waveform.Hide()
 
 	divider := canvas.NewRectangle(color.NRGBA{R: 30, G: 42, B: 67, A: 255})
 	divider.SetMinSize(fyne.NewSize(1, 1))
@@ -101,7 +99,6 @@ func New(app fyne.App, cfg *config.Config) *Desktop {
 	recordArea := container.NewVBox(
 		container.NewCenter(d.button),
 		container.NewCenter(container.NewHBox(statusDot, d.status)),
-		container.NewCenter(d.waveform),
 	)
 	top := container.NewVBox(fields, options, divider)
 	// Border gives the visible result entry all spare vertical space on resize.
@@ -197,9 +194,7 @@ func (d *Desktop) start() {
 			d.button.SetText("Stop recording")
 			d.button.SetIcon(theme.MediaStopIcon())
 			d.button.Importance = widget.DangerImportance
-			d.status.SetText("Recording…")
-			d.setStatusColor(color.NRGBA{R: 251, G: 113, B: 133, A: 255})
-			d.waveform.Show()
+			d.status.SetText("* Recording")
 			d.modelSelect.Disable()
 			d.templateSelect.Disable()
 			d.languageSelect.Disable()
@@ -218,7 +213,6 @@ func (d *Desktop) stopAndProcess() {
 	d.status.SetText("Finalizing transcript…")
 	d.button.Importance = widget.MediumImportance
 	d.setStatusColor(color.NRGBA{R: 251, G: 191, B: 36, A: 255})
-	d.waveform.Hide()
 
 	model := d.selectedModel()
 	template := d.selectedTemplate().Text
@@ -255,6 +249,7 @@ func (d *Desktop) stopAndProcess() {
 			},
 		}
 		err = processor.ProcessRecognized(context.Background(), recognized, language, template)
+		if err == nil && d.config.Settings.BeepOnCompletion { audio.Beep() }
 		fyne.Do(func() {
 			d.processing = false
 			if err != nil {

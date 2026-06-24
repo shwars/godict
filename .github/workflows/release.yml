@@ -1,91 +1,93 @@
-name: Release
+name: Build and release
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without the v prefix (for example, 0.1.0)
+        description: Release version without the v prefix
         required: true
         type: string
-      title:
-        description: Release title shown on GitHub
+      create_release:
+        description: Create a tagged GitHub Release after building
         required: true
+        default: false
+        type: boolean
+      build_windows_arm64:
+        description: Also Docker-cross-build Windows ARM64
+        required: true
+        default: false
+        type: boolean
+      title:
+        description: Release title (required only when creating a release)
+        required: false
         type: string
       description:
-        description: Release description (Markdown supported)
-        required: true
+        description: Release description in Markdown (required only when creating a release)
+        required: false
         type: string
 
 permissions:
   contents: write
 
 jobs:
-  build-windows-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.x'
-      - name: Build Windows and Linux archives
-        shell: pwsh
-        run: ./scripts/build-release.ps1 -Version '${{ inputs.version }}' -Targets windows-amd64,windows-arm64,linux-amd64
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-windows-linux
-          path: releases/*.zip
-          if-no-files-found: error
-
-  build-macos:
+  native-build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Docker/Fyne-cross cannot build a macOS binary on Linux without a
-          # separately supplied Apple SDK. Intel macOS is intentionally opt-in
-          # locally and is not part of the default GitHub release matrix.
-          - runner: macos-14
-            arch: arm64
+          - target: windows-amd64
+            runner: windows-latest
+          - target: linux-amd64
+            runner: ubuntu-latest
+          - target: darwin-arm64
+            runner: macos-14
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.x'
-      - name: Build macOS archive
-        env:
-          VERSION: ${{ inputs.version }}
-          ARCH: ${{ matrix.arch }}
-        run: |
-          set -euo pipefail
-          name="godict_${VERSION}_darwin_${ARCH}"
-          mkdir -p "releases/${name}"
-          go build -trimpath -ldflags="-s -w" -o "releases/${name}/godict" .
-          cp godict.config "releases/${name}/godict.config"
-          (
-            cd releases
-            ditto -c -k --sequesterRsrc --keepParent "${name}" "${name}.zip"
-          )
-          rm -rf "releases/${name}"
+        with: { go-version: '1.24.x' }
+      - name: Install Linux Fyne prerequisites
+        if: matrix.target == 'linux-amd64'
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev
+      - name: Build native archive
+        shell: pwsh
+        run: ./scripts/build-github-release.ps1 -Version '${{ inputs.version }}' -Target '${{ matrix.target }}'
       - uses: actions/upload-artifact@v4
         with:
-          name: release-macos-${{ matrix.arch }}
+          name: ${{ matrix.target }}
+          path: releases/*.zip
+          if-no-files-found: error
+
+  windows-arm64:
+    if: inputs.build_windows_arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24.x' }
+      - name: Build Windows ARM64 archive with Docker
+        shell: pwsh
+        run: ./scripts/build-github-release.ps1 -Version '${{ inputs.version }}' -Target windows-arm64 -WindowsArm64Docker
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-arm64
           path: releases/*.zip
           if-no-files-found: error
 
   release:
-    needs: [build-windows-linux, build-macos]
+    if: ${{ always() && inputs.create_release && needs.native-build.result == 'success' && (needs.windows-arm64.result == 'success' || needs.windows-arm64.result == 'skipped') }}
+    needs: [native-build, windows-arm64]
     runs-on: ubuntu-latest
     steps:
-      # gh resolves --target through the local checkout, not only the SHA.
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with:
-          path: releases
-          merge-multiple: true
+        with: { path: releases, merge-multiple: true }
+      - name: Validate release metadata
+        env: { TITLE: ${{ inputs.title }}, DESCRIPTION: ${{ inputs.description }} }
+        run: test -n "$TITLE" && test -n "$DESCRIPTION"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TITLE: ${{ inputs.title }}
-          RELEASE_DESCRIPTION: ${{ inputs.description }}
-        run: gh release create "v${{ inputs.version }}" releases/*.zip --target "${{ github.sha }}" --title "$RELEASE_TITLE" --notes "$RELEASE_DESCRIPTION"
+          TITLE: ${{ inputs.title }}
+          DESCRIPTION: ${{ inputs.description }}
+        run: gh release create "v${{ inputs.version }}" releases/*.zip --target "${{ github.sha }}" --title "$TITLE" --notes "$DESCRIPTION"

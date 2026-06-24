@@ -1,5 +1,7 @@
 # GoDict
 
+[Русская версия](README.ru.md)
+
 GoDict is a small cross-platform desktop dictator. Choose a prompt template, LLM, and recognition language; press **Start recording**, dictate, then press **Stop recording**. GoDict streams raw 16-bit PCM microphone audio to Yandex SpeechKit v3 while you dictate, then sends the final recognized text to an OpenAI Responses-compatible LLM and copies the generated result to the clipboard. It does not use SpeechKit's 1 MB short-audio HTTP endpoint, so long recordings are governed by the active streaming session and account limits rather than a 30-second client upload limit.
 
 ## Setup
@@ -63,6 +65,6 @@ Build a subset when you only need one platform, for example:
 .\scripts\build-release.ps1 -Version 0.1.0 -Targets darwin-amd64
 ```
 
-The release script requires Docker. By default it creates standalone binaries for Windows x64, Windows ARM64, Linux x64, and macOS ARM64. macOS x64 remains available as the explicit `darwin-amd64` target, but is excluded by default. Output ZIP files are written to `releases/`, which is ignored by Git. macOS builds are unsigned, so users may need to approve them in System Settings before launching from Terminal.
+The local release script requires Docker/Fyne-cross. By default it creates standalone binaries for Windows x64, Windows ARM64, Linux x64, and macOS ARM64. macOS x64 remains available as the explicit `darwin-amd64` target, but is excluded by default. Output ZIP files are written to `releases/`, which is ignored by Git. macOS builds are unsigned, so users may need to approve them in System Settings before launching from Terminal.
 
-The GitHub Actions **Release** workflow is manually triggered with a version and publishes the same archives as a GitHub Release.
+The manually triggered GitHub Actions workflow builds Windows x64, Linux x64, and macOS ARM64 on their native hosted runners. `build_windows_arm64` optionally adds the Docker cross-build. Set `create_release` to `false` to keep the ZIPs as workflow artifacts only; set it to `true` and provide a title and description to publish a GitHub Release.

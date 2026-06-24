@@ -1,11 +1,33 @@
 package audio
 
 import (
+	"encoding/binary"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/gen2brain/malgo"
 )
+
+// Beep plays a short completion tone asynchronously. Failure to open an output
+// device is intentionally ignored so notifications never affect dictation.
+func Beep() { go playBeep() }
+
+func playBeep() {
+	ctx, err := malgo.InitContext(nil, malgo.ContextConfig{}, func(string) {})
+	if err != nil { return }
+	defer func() { _ = ctx.Uninit(); ctx.Free() }()
+	config := malgo.DefaultDeviceConfig(malgo.Playback)
+	config.Playback.Format, config.Playback.Channels, config.SampleRate = malgo.FormatS16, 1, 44100
+	var sample uint32
+	device, err := malgo.InitDevice(ctx.Context, config, malgo.DeviceCallbacks{Data: func(output, _ []byte, frames uint32) {
+		for i := uint32(0); i < frames; i++ { var value int16; if (sample/50)%2 == 0 { value = 9000 }; binary.LittleEndian.PutUint16(output[i*2:], uint16(value)); sample++ }
+	}})
+	if err != nil { return }
+	defer device.Uninit()
+	if device.Start() != nil { return }
+	time.Sleep(100 * time.Millisecond)
+}
 
 // ChunkHandler receives a copy of each PCM16 mono audio chunk. Implementations
 // must return quickly: it is called from the microphone callback.

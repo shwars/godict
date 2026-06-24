@@ -54,6 +54,8 @@ try {
         New-Item -ItemType Directory -Force -Path $stage | Out-Null
         Copy-Item -LiteralPath $binary.FullName -Destination (Join-Path $stage $target.Executable)
         Copy-Item -LiteralPath (Join-Path $root 'godict.config') -Destination (Join-Path $stage 'godict.config')
+        Copy-Item -LiteralPath (Join-Path $root 'godict.ru.config') -Destination (Join-Path $stage 'godict.ru.config')
+        Copy-Item -LiteralPath (Join-Path $root 'godict.en.config') -Destination (Join-Path $stage 'godict.en.config')
         Compress-Archive -Path (Join-Path $stage '*') -DestinationPath (Join-Path $releases "$name.zip") -Force
         Remove-Item -Recurse -Force $stage
     }
