@@ -54,21 +54,29 @@ try {
             # packager embeds Icon.png as the PE application resource and also
             # selects the Windows GUI subsystem, so launching GoDict does not
             # leave a console attached to the process.
-            Push-Location $stage
+            # Fyne must place its generated .syso file beside the Go package
+            # source. Building directly into $stage would leave that resource
+            # outside the source directory, resulting in a generic icon.
+            $packagedExecutable = Join-Path $root $targetDefinition.Executable
+            if (Test-Path $packagedExecutable) {
+                throw "Refusing to overwrite existing $packagedExecutable while packaging Windows."
+            }
             try {
                 & go run fyne.io/fyne/v2/cmd/fyne@v2.6.3 package `
                     -os windows `
                     -src $root `
-                    -executable $destination `
                     -name godict `
                     -icon (Join-Path $root 'Icon.png') `
                     -appID net.godict.desktop `
                     -release
                 if ($LASTEXITCODE -ne 0) { throw 'Fyne package failed for windows/amd64.' }
+                if (-not (Test-Path $packagedExecutable)) {
+                    throw 'Fyne package did not produce godict.exe.'
+                }
+                Copy-Item $packagedExecutable $destination
             }
-            finally { Pop-Location }
-            if (-not (Test-Path $destination)) {
-                throw 'Fyne package did not produce godict.exe.'
+            finally {
+                Remove-Item -Force -ErrorAction SilentlyContinue $packagedExecutable
             }
         } else {
             & go build -trimpath '-ldflags=-s -w' -o $destination .
