@@ -78,7 +78,7 @@ func TestBundledConfigParses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.Models) != 10 || len(cfg.Templates) != 4 {
+	if len(cfg.Models) != 10 || len(cfg.Templates) != 9 {
 		t.Fatalf("models=%d templates=%d", len(cfg.Models), len(cfg.Templates))
 	}
 }

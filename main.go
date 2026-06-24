@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,8 +15,15 @@ import (
 	"godict/internal/ui"
 )
 
+// applicationIcon is embedded so the window and task switcher retain the
+// GoDict microphone icon even when the executable is copied elsewhere.
+//
+//go:embed Icon.png
+var applicationIcon []byte
+
 func main() {
 	application := app.NewWithID("net.godict.desktop")
+	application.SetIcon(fyne.NewStaticResource("Icon.png", applicationIcon))
 	configPath, err := configPath()
 	if err != nil {
 		showStartupError(application, err)

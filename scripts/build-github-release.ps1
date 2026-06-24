@@ -49,14 +49,31 @@ try {
         if ($hostOS -ne $targetDefinition.OS -or $hostArch -ne $targetDefinition.Arch) {
             throw "Native target $Target requires $($targetDefinition.OS)/$($targetDefinition.Arch), got $hostOS/$hostArch."
         }
-        $linkerFlags = '-s -w'
         if ($Target -eq 'windows-amd64') {
-            # Match the GUI-subsystem executable produced by Fyne-cross so an
-            # interactive Windows shell does not remain attached to GoDict.
-            $linkerFlags = '-s -w -H=windowsgui'
+            # `go build` creates a generic Windows executable icon. Fyne's
+            # packager embeds Icon.png as the PE application resource and also
+            # selects the Windows GUI subsystem, so launching GoDict does not
+            # leave a console attached to the process.
+            Push-Location $stage
+            try {
+                & go run fyne.io/fyne/v2/cmd/fyne@v2.6.3 package `
+                    -os windows `
+                    -src $root `
+                    -executable $destination `
+                    -name godict `
+                    -icon (Join-Path $root 'Icon.png') `
+                    -appID net.godict.desktop `
+                    -release
+                if ($LASTEXITCODE -ne 0) { throw 'Fyne package failed for windows/amd64.' }
+            }
+            finally { Pop-Location }
+            if (-not (Test-Path $destination)) {
+                throw 'Fyne package did not produce godict.exe.'
+            }
+        } else {
+            & go build -trimpath '-ldflags=-s -w' -o $destination .
+            if ($LASTEXITCODE -ne 0) { throw "Native build failed for $Target." }
         }
-        & go build -trimpath "-ldflags=$linkerFlags" -o $destination .
-        if ($LASTEXITCODE -ne 0) { throw "Native build failed for $Target." }
     }
     foreach ($config in 'godict.config', 'godict.ru.config', 'godict.en.config') {
         Copy-Item (Join-Path $root $config) (Join-Path $stage $config)
