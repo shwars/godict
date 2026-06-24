@@ -13,6 +13,21 @@ GoDict is a small cross-platform desktop dictator. Choose a prompt template, LLM
 
 The supplied configuration contains the model entries from the existing `gogpt.config` example and two templates: `correct` and `professional`. The default SpeechKit language list is `Auto`, Russian, and English; edit `speech.languages` to add other SpeechKit language codes.
 
+## Installation
+
+Unpack the release archive, choose a starter configuration, and keep it beside the executable under the name `godict.config`. On macOS, `/usr/local/bin` is normally already on your `PATH`, so you can install both files there:
+
+```sh
+sudo cp godict godict.config /usr/local/bin/
+```
+
+The macOS binaries are unsigned. If macOS blocks the downloaded executable, remove its quarantine attribute and then start it from Terminal:
+
+```sh
+sudo xattr -d com.apple.quarantine /usr/local/bin/godict
+godict
+```
+
 ## Configuration format
 
 `godict.config` is HCL. Models and templates are named blocks:
